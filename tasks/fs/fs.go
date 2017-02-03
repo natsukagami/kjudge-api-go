@@ -49,3 +49,9 @@ func Chmod(source, mode string) error {
 	tsk := task.NewTask("chmod", []string{"-R", mode, source}, "")
 	return runFsTask(&tsk)
 }
+
+// Remove removes the specified folder/file
+func Remove(source string) error {
+	tsk := task.NewTask("rm", []string{"-rf", source}, "")
+	return runFsTask(&tsk)
+}

@@ -50,3 +50,8 @@ func (c Cpp) CompileComparator(problemFolder string) error {
 	tsk := task.NewTask(c.exec(), append(c.defaultArgs(), "compare", "compare"+c.Ext()), problemFolder)
 	return doCompile(&tsk)
 }
+
+// RunCommand returns the required command to run the executable.
+func (c Cpp) RunCommand(name string) string {
+	return "./" + name
+}

@@ -2,6 +2,7 @@ package queue
 
 import (
 	"fmt"
+	"math/rand"
 	"strconv"
 	"strings"
 	"sync"
@@ -11,13 +12,17 @@ import (
 )
 
 func TestQueue(t *testing.T) {
-	main()
 	var n = 10
 	wg := sync.WaitGroup{}
 	for i := 0; i < n; i++ {
 		go func(id int) {
 			tsk := task.NewTask(fmt.Sprintf("echo"), []string{fmt.Sprintf("%d", id)}, "")
-			num := Enqueue(&tsk)
+			var num task.Result
+			if rand.Int()%2 == 0 {
+				num = Enqueue(&tsk)
+			} else {
+				num = PriorizedEnqueue(&tsk)
+			}
 			if x, e := strconv.ParseInt(strings.Replace(num.Stdout, "\n", "", -1), 10, 32); e != nil || x != int64(id) {
 				t.Error("Invalid pattern: " + e.Error())
 			} else {
@@ -31,7 +36,6 @@ func TestQueue(t *testing.T) {
 }
 
 func BenchmarkQueue(b *testing.B) {
-	main()
 	var n = b.N
 	wg := sync.WaitGroup{}
 	wg.Add(n)

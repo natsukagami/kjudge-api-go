@@ -7,7 +7,6 @@ import (
 )
 
 // CompilersCount represents the number of concurrent compilers.
-const compilersCount = 1
 
 // CompileFailed is a wrapper for compile-failed submissions.
 type compileFailed struct {

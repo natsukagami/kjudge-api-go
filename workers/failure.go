@@ -8,8 +8,6 @@ type failure interface {
 	Error() string
 }
 
-const failHandlersCount = 7
-
 func failHandler(in <-chan failure, out chan<- *kjudge.Submission) {
 	for sub := range in {
 		sub.Sub().JudgeError = sub.Error()

@@ -6,8 +6,6 @@ import (
 	kjudge "github.com/natsukagami/kjudge-api-go"
 )
 
-const scorersCount = 1
-
 // ScoreError is an error that happens when scoring failed
 type scoreError struct {
 	message string
@@ -88,8 +86,8 @@ func groupRatioScoring(results []kjudge.TestResult, tests []kjudge.Test, scoring
 			return kjudge.Result{}, scoreError{"The number of tests is not consistent?"}
 		}
 		for i := 0; i < score.Num; i++ {
-			cur++
 			ratio = comb(ratio, results[cur].Score)
+			cur++
 		}
 		res.Subtasks[id].Score = ratio * score.Score
 		res.Score += ratio * score.Score

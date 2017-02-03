@@ -2,7 +2,6 @@ package workers
 
 import (
 	"path"
-	"sync"
 
 	kjudge "github.com/natsukagami/kjudge-api-go"
 	"github.com/natsukagami/kjudge-api-go/misc"
@@ -23,7 +22,7 @@ func (c testingFailed) Sub() *kjudge.Submission {
 }
 
 func (c testingFailed) Error() string {
-	return "Compilation failed: " + c.err.Error()
+	return "Testing failed: " + c.err.Error()
 }
 
 // TestingSuccess wraps a Submission with successful testing, adding
@@ -42,33 +41,27 @@ type testingItem struct {
 	Out    chan<- testingItem
 }
 
-const (
-	testersCount     = 2
-	testRunnersCount = 7
-)
-
 var testRuns = make(chan testingItem)
 
 func tester(in <-chan *kjudge.Submission, success chan<- testingSuccess, fail chan<- failure) {
 	for sub := range in {
 		out := make(chan testingItem)
 		res := make([]kjudge.TestResult, len(sub.Problem.Tests))
-		var err error
-		wg := sync.WaitGroup{}
-		wg.Add(len(sub.Problem.Tests))
 		for i := range sub.Problem.Tests {
 			go func(id int) {
 				testRuns <- testingItem{Submission: sub, TestID: id, Out: out}
-				r := <-out
-				if r.Err != nil {
-					err = r.Err
-				} else {
-					res[r.TestID] = r.Result
-				}
-				wg.Done()
 			}(i)
 		}
-		wg.Wait()
+		var err error
+		for i := 0; i < len(sub.Problem.Tests); i++ {
+			r := <-out
+			if r.Err != nil {
+				err = r.Err
+				break
+			} else {
+				res[r.TestID] = r.Result
+			}
+		}
 		if err != nil {
 			fail <- testingFailed{sub, err}
 		} else {
@@ -83,6 +76,14 @@ func testRunner() {
 	}
 }
 
+func folderClean(folder string) {
+	go fs.Remove(folder)
+}
+
+func isolateClean(box *runners.Isolate) {
+	go box.Cleanup()
+}
+
 func runTest(test testingItem) testingItem {
 	sub := test.Submission
 	t := &sub.Problem.Tests[test.TestID]
@@ -93,28 +94,26 @@ func runTest(test testingItem) testingItem {
 		test.Err = err
 		return test
 	}
+	defer folderClean(folder)
+	isolate := runners.Make()
+	defer isolateClean(isolate)
 	// Step 2. Copy the input files
-	if err := fs.Copy(t.Input, path.Join(folder, "input.txt")); err != nil {
-		test.Err = err
-		return test
-	}
-	if err := fs.Copy(path.Clean(sub.Folder)+"/.", folder); err != nil {
-		test.Err = err
-		return test
-	}
-	if err := fs.Chmod(folder, "777"); err != nil {
-		test.Err = err
-		return test
+	{
+		c := make(chan error)
+		go func() { c <- fs.Copy(t.Input, path.Join(folder, "input.txt")) }()
+		go func() { c <- fs.Copy(path.Clean(sub.Folder)+"/.", folder) }()
+		go func() { c <- fs.Chmod(folder, "777") }()
+		go func() { c <- isolate.Prepare() }()
+		for i := 0; i < 4; i++ {
+			if err := <-c; err != nil {
+				test.Err = err
+				return test
+			}
+		}
 	}
 	// Step 3: Runs the code in a sandbox
-	isolate := runners.Make()
-	defer isolate.Cleanup()
-	if err := isolate.Prepare(); err != nil {
-		test.Err = err
-		return test
-	}
 	r, err := isolate.Run(
-		path.Join(folder, sub.Problem.Name),
+		sub.Language().RunCommand(sub.Problem.Name),
 		folder,
 		sub.Problem.Time,
 		sub.Problem.Mem,
@@ -136,7 +135,7 @@ func runTest(test testingItem) testingItem {
 	if sub.Problem.Comparator {
 		v, err = comparators.Comparator(sub.Problem.Folder, t.Input, path.Join(folder, "output.txt"), t.Output)
 	} else {
-		v, err = comparators.Diff(path.Join(folder, "out.txt"), t.Output)
+		v, err = comparators.Diff(path.Join(folder, "output.txt"), t.Output)
 	}
 	if err != nil {
 		test.Err = err

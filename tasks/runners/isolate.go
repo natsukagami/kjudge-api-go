@@ -30,13 +30,10 @@ func (i *Isolate) Prepare() error {
 	tsk := task.NewTask("isolate", []string{
 		"--init",
 		"--cg",
-		"-b", string(i.id),
+		"-b", strconv.Itoa(i.id),
 	}, "")
 	res := queue.Enqueue(&tsk)
 	if res.ExitCode != 0 {
-		go func() { // Must be done async or the code will block
-			boxID <- i.id
-		}()
 		return Error{res.Stderr, res.ExitCode}
 	}
 	return nil
@@ -55,8 +52,13 @@ func (i *Isolate) Run(cmd, cwd string, time, mem int64) (r Result, e error) {
 		"-i", path.Join(i.Dir(), "env", "input.txt"),
 		"-o", path.Join(i.Dir(), "env", "output.txt"),
 		"-M", path.Join(cwd, "meta.txt"),
+		path.Join(i.Dir(), "env", cmd),
 	}, "")
-	queue.Enqueue(&tsk)
+	res := queue.PriorizedEnqueue(&tsk)
+	if res.ExitCode > 1 {
+		e = Error{res.Stderr, res.ExitCode}
+		return
+	}
 	// Opens the meta file
 	dat, err := ioutil.ReadFile(path.Join(cwd, "meta.txt"))
 	if err != nil {
@@ -117,4 +119,12 @@ func (i *Isolate) Cleanup() error {
 func Make() *Isolate {
 	box := Isolate{<-boxID}
 	return &box
+}
+
+func init() {
+	for i := 0; i < 10; i++ {
+		go func(id int) {
+			boxID <- id
+		}(i)
+	}
 }

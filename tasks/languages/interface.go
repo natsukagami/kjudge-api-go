@@ -13,6 +13,7 @@ type Interface interface {
 	Compile(name, folder string) error
 	CompileGrader(name, folder, problemFolder string) error
 	CompileComparator(problemFolder string) error
+	RunCommand(name string) string
 	Ext() string
 }
 

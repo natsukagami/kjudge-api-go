@@ -2,6 +2,14 @@ package workers
 
 import kjudge "github.com/natsukagami/kjudge-api-go"
 
+const (
+	testersCount      = 2
+	testRunnersCount  = 7
+	compilersCount    = 1
+	scorersCount      = 1
+	failHandlersCount = 7
+)
+
 // Input is the place you push all the submissions
 var Input = make(chan *kjudge.Submission)
 
