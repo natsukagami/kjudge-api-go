@@ -23,7 +23,7 @@ func (e Error) Error() string {
 // Interface presents a sandbox implementation
 type Interface interface {
 	Prepare() error
-	Run(cmd, cwd string, time, mem int64) (Result, error)
+	Run(cmd, cwd string, time, mem int64) (*Result, error)
 	Cleanup() error
 }
 

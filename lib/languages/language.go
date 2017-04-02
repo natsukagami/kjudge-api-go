@@ -2,18 +2,18 @@
 package languages
 
 import (
+	"errors"
 	"fmt"
 
 	"github.com/natsukagami/kjudge-api-go/task"
-	"github.com/natsukagami/kjudge-api-go/task/queue"
 )
 
-// Interface represents a compiler's set of functions
-type Interface interface {
+// Language represents a compiler's set of functions
+type Language interface {
 	Compile(name, folder string) error
 	CompileGrader(name, folder, problemFolder string) error
 	CompileComparator(problemFolder string) error
-	RunCommand(name string) string
+	Executable(name string, folder string) string
 	Ext() string
 }
 
@@ -28,21 +28,20 @@ func (e Error) Error() string {
 }
 
 func doCompile(t *task.Task) error {
-	res := queue.Enqueue(t)
+	res := task.Enqueue(t)
 	if res.ExitCode != 0 {
 		return Error{res.Stderr, res.ExitCode}
 	}
 	return nil
 }
 
-// NoLanguageError is an error thrown when a submission is found with no
-// supported language.
-type NoLanguageError struct {
+// New returns a language instance, based on the provided extension.
+func New(ext string) (l Language, err error) {
+	switch ext {
+	case ".cpp", ".cc":
+		l = &cpp{}
+	default:
+		err = errors.New("No language found for ext: " + ext)
+	}
+	return
 }
-
-func (e NoLanguageError) Error() string {
-	return "No language found"
-}
-
-// All provides an array of supported languages
-var All = []Interface{Cpp{}}

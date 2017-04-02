@@ -1,26 +1,27 @@
-// Package queue provides an universal queue of tasks
-package queue
+// Package task also provides an universal queue of tasks.
+package task
 
-import "github.com/natsukagami/kjudge-api-go/task"
-
-const runners = 20
+// Runners defines the number of concurrent task runners.
+const (
+	Runners = 2000
+)
 
 // Item represents a queue item
 type item struct {
-	*task.Task
-	ch chan task.Result
+	*Task
+	ch chan *Result
 }
 
 var (
 	input    = make(chan item)
-	block    = make(chan bool)
-	unblock  = make(chan bool)
+	block    = make(chan struct{})
+	unblock  = make(chan struct{})
 	priorize = make(chan item)
 )
 
 // Enqueue adds the specified task into the queue
-func Enqueue(t *task.Task) task.Result {
-	ch := make(chan task.Result)
+func Enqueue(t *Task) *Result {
+	ch := make(chan *Result)
 	go func() {
 		input <- item{t, ch}
 	}()
@@ -29,8 +30,8 @@ func Enqueue(t *task.Task) task.Result {
 
 // PriorizedEnqueue adds the task into the priorized channel.
 // It runs only when no other tasks are running
-func PriorizedEnqueue(t *task.Task) task.Result {
-	ch := make(chan task.Result)
+func PriorizedEnqueue(t *Task) *Result {
+	ch := make(chan *Result)
 	go func() {
 		priorize <- item{t, ch}
 	}()
@@ -56,19 +57,19 @@ func taskRunner(i <-chan item) {
 
 func priorizedRunner(i <-chan item) {
 	for x := range i {
-		for n := 0; n < runners; n++ {
-			block <- true
+		for n := 0; n < Runners; n++ {
+			block <- struct{}{}
 		}
 		runTask(&x)
-		for n := 0; n < runners; n++ {
-			unblock <- true
+		for n := 0; n < Runners; n++ {
+			unblock <- struct{}{}
 		}
 	}
 }
 
 func init() {
 	// Initialize workers, because channels are synchronous
-	for i := 0; i < runners; i++ {
+	for i := 0; i < Runners; i++ {
 		go taskRunner(input)
 	}
 	go priorizedRunner(priorize)

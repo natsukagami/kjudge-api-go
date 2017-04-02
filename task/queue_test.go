@@ -1,4 +1,4 @@
-package queue
+package task
 
 import (
 	"fmt"
@@ -7,8 +7,6 @@ import (
 	"strings"
 	"sync"
 	"testing"
-
-	"github.com/natsukagami/kjudge-api-go/task"
 )
 
 func TestQueue(t *testing.T) {
@@ -16,12 +14,12 @@ func TestQueue(t *testing.T) {
 	wg := sync.WaitGroup{}
 	for i := 0; i < n; i++ {
 		go func(id int) {
-			tsk := task.NewTask(fmt.Sprintf("echo"), []string{fmt.Sprintf("%d", id)}, "")
-			var num task.Result
+			tsk := New("echo", []string{fmt.Sprintf("%d", id)}, "")
+			var num Result
 			if rand.Int()%2 == 0 {
-				num = Enqueue(&tsk)
+				num = Enqueue(tsk)
 			} else {
-				num = PriorizedEnqueue(&tsk)
+				num = PriorizedEnqueue(tsk)
 			}
 			if x, e := strconv.ParseInt(strings.Replace(num.Stdout, "\n", "", -1), 10, 32); e != nil || x != int64(id) {
 				t.Error("Invalid pattern: " + e.Error())
@@ -41,8 +39,8 @@ func BenchmarkQueue(b *testing.B) {
 	wg.Add(n)
 	for i := 0; i < n; i++ {
 		go func(id int) {
-			tsk := task.NewTask(fmt.Sprintf("echo"), []string{fmt.Sprintf("%d", id)}, "")
-			num := Enqueue(&tsk)
+			tsk := New("echo", []string{fmt.Sprintf("%d", id)}, "")
+			num := Enqueue(tsk)
 			if x, e := strconv.ParseInt(strings.Replace(num.Stdout, "\n", "", -1), 10, 32); e != nil || x != int64(id) {
 				b.Error("Invalid pattern: " + e.Error())
 			}

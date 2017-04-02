@@ -8,31 +8,30 @@ import (
 	"strings"
 
 	"github.com/natsukagami/kjudge-api-go/task"
-	"github.com/natsukagami/kjudge-api-go/task/queue"
 )
 
 // This file implements a Runner struct using the isolate command.
 
-var boxID = make(chan int)
+var boxID = make(chan string, 1000)
 
 // Isolate is an implemention of isolate sandbox wrapper.
 type Isolate struct {
-	id int
+	id string
 }
 
 // Dir returns the directory of the sandbox
 func (i *Isolate) Dir() string {
-	return fmt.Sprintf("/var/lib/isolate/%d/box", i.id)
+	return fmt.Sprintf("/var/lib/isolate/%s/box", i.id)
 }
 
 // Prepare prepares the sandbox for usage
 func (i *Isolate) Prepare() error {
-	tsk := task.NewTask("isolate", []string{
+	tsk := task.New("isolate", []string{
 		"--init",
 		"--cg",
-		"-b", strconv.Itoa(i.id),
+		"-b", i.id,
 	}, "")
-	res := queue.Enqueue(&tsk)
+	res := task.Enqueue(tsk)
 	if res.ExitCode != 0 {
 		return Error{res.Stderr, res.ExitCode}
 	}
@@ -40,9 +39,9 @@ func (i *Isolate) Prepare() error {
 }
 
 // Run runs the command under the sandbox's restrictions
-func (i *Isolate) Run(cmd, cwd string, time, mem int64) (r Result, e error) {
-	tsk := task.NewTask("isolate", []string{
-		"-b", strconv.Itoa(i.id),
+func (i *Isolate) Run(cmd, cwd string, time, mem int64) (r *Result, e error) {
+	tsk := task.New("isolate", []string{
+		"-b", i.id,
 		"--cg",
 		"--run",
 		"--dir=" + path.Join(i.Dir(), "env") + "=" + cwd + ":rw",
@@ -54,7 +53,7 @@ func (i *Isolate) Run(cmd, cwd string, time, mem int64) (r Result, e error) {
 		"-M", path.Join(cwd, "meta.txt"),
 		path.Join(i.Dir(), "env", cmd),
 	}, "")
-	res := queue.PriorizedEnqueue(&tsk)
+	res := task.PriorizedEnqueue(tsk)
 	if res.ExitCode > 1 {
 		e = Error{res.Stderr, res.ExitCode}
 		return
@@ -67,6 +66,7 @@ func (i *Isolate) Run(cmd, cwd string, time, mem int64) (r Result, e error) {
 	}
 	meta := strings.Split(string(dat), "\n")
 	var timeWall int64 = -1
+	r = &Result{}
 	r.Status = "OK"
 	for _, str := range meta {
 		line := strings.Split(str, ":")
@@ -104,8 +104,8 @@ func (i *Isolate) Run(cmd, cwd string, time, mem int64) (r Result, e error) {
 
 // Cleanup cleans the sandbox and make it ready for another use
 func (i *Isolate) Cleanup() error {
-	tsk := task.NewTask("isolate", []string{"--cleanup", "-b", strconv.Itoa(i.id)}, "")
-	res := queue.Enqueue(&tsk)
+	tsk := task.New("isolate", []string{"--cleanup", "-b", i.id}, "")
+	res := task.Enqueue(tsk)
 	go func() {
 		boxID <- i.id
 	}()
@@ -115,16 +115,14 @@ func (i *Isolate) Cleanup() error {
 	return nil
 }
 
-// Make creates a new isolate sandbox
-func Make() *Isolate {
+// New creates a new isolate sandbox
+func New() *Isolate {
 	box := Isolate{<-boxID}
 	return &box
 }
 
 func init() {
-	for i := 0; i < 10; i++ {
-		go func(id int) {
-			boxID <- id
-		}(i)
+	for i := 0; i < 1000; i++ {
+		boxID <- strconv.Itoa(i)
 	}
 }

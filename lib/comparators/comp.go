@@ -8,7 +8,6 @@ import (
 	"strings"
 
 	"github.com/natsukagami/kjudge-api-go/task"
-	"github.com/natsukagami/kjudge-api-go/task/queue"
 )
 
 // Result is a struct that holds a comparator's output
@@ -32,8 +31,8 @@ func (e Error) Error() string {
 // Note that output and answer arguments are filepaths rather than
 // text contents.
 func Diff(output, answer string) (r Result, e error) {
-	tsk := task.NewTask("diff", []string{"-wq", output, answer}, "")
-	res := queue.Enqueue(&tsk)
+	tsk := task.New("diff", []string{"-wq", output, answer}, "")
+	res := task.Enqueue(tsk)
 	if res.ExitCode == 0 {
 		r = Result{1.0, "Output is Correct"}
 	} else if res.ExitCode == 1 {
@@ -49,8 +48,8 @@ func Diff(output, answer string) (r Result, e error) {
 // and writes only ONE number to stdout that is a float between 0 and 1 as the
 // score, and write anything on stderr as the output.
 func Comparator(problemFolder, input, output, answer string) (r Result, e error) {
-	tsk := task.NewTask("./compare", []string{input, output, answer}, problemFolder)
-	res := queue.Enqueue(&tsk)
+	tsk := task.New("./compare", []string{input, output, answer}, problemFolder)
+	res := task.Enqueue(tsk)
 	if res.ExitCode == 0 {
 		if x, err := strconv.ParseFloat(strings.Replace(res.Stdout, "\n", "", -1), 64); e == nil {
 			r.Score = math.Max(0, math.Min(1, x))

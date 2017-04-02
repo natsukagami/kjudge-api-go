@@ -3,7 +3,6 @@ package task
 
 import (
 	"bytes"
-	"fmt"
 	"os/exec"
 	"syscall"
 
@@ -30,14 +29,15 @@ type Task struct {
 
 // Run executes the command synchronorously.
 // The result is a Task.Result object.
-func (t *Task) Run() (r Result) {
-	fmt.Printf("Task %d: Running `%s %s` @ %s\n", t.id, t.Command, t.Args, t.Cwd)
+func (t *Task) Run() (r *Result) {
+	taskDebug("Task %d: Running `%s %s` @ %s\n", t.id, t.Command, t.Args, t.Cwd)
 	osCmd := exec.Command(t.Command, t.Args...)
 	osCmd.Dir = t.Cwd
 	var stdout, stderr bytes.Buffer
 	osCmd.Stderr = &stderr
 	osCmd.Stdout = &stdout
 	err := osCmd.Run()
+	r = new(Result)
 	r.Stdout = stdout.String()
 	r.Stderr = stderr.String()
 	if err == nil {
@@ -50,7 +50,7 @@ func (t *Task) Run() (r Result) {
 			r.ExitCode = -1
 		}
 	}
-	fmt.Printf("Task %d: Done (exitcode %d) (stdout %s) (stderr %s)\n", t.id, r.ExitCode, r.Stdout, r.Stderr)
+	taskDebug("Task %d: Done (exitcode %d) (stdout %s) (stderr %s)\n", t.id, r.ExitCode, r.Stdout, r.Stderr)
 	return
 }
 
@@ -61,11 +61,11 @@ func (t Task) ID() int {
 
 var index = 0
 
-// NewTask creates a new Task. Use this function to
+// New creates a new Task. Use this function to
 // initialize the Task with an ID.
-func NewTask(command string, args []string, cwd string) Task {
+func New(command string, args []string, cwd string) *Task {
 	index++
-	return Task{
+	return &Task{
 		Command: command,
 		Args:    args,
 		Cwd:     cwd,

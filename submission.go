@@ -1,27 +1,76 @@
 package kjudge
 
 import (
+	"io/ioutil"
 	"os"
-	"path"
+	"path/filepath"
 
-	"github.com/natsukagami/kjudge-api-go/tasks/languages"
+	"github.com/natsukagami/kjudge-api-go/lib/languages"
+	"github.com/pkg/errors"
 )
 
 // Submission represents a submission model.
 type Submission struct {
-	Folder     string
-	Problem    Problem
-	Result     Result
-	JudgeError string
+	Problem    *Problem           `json:"problem"`
+	Content    []byte             `json:"content"`
+	Ext        string             `json:"language"`
+	Language   languages.Language `json:"-"`
+	Result     *Result            `json:"result"`
+	JudgeError error              `json:"judgeError"`
 }
 
-// Language returns the language of the submission, or nil
-// if none is supported.
-func (s Submission) Language() languages.Interface {
-	for _, l := range languages.All {
-		if _, e := os.Stat(path.Join(s.Folder, s.Problem.Name+l.Ext())); e == nil {
-			return l
-		}
+// NewSub creates a new submission parsed from a file given in path.
+func NewSub(file string, prob *Problem) (s *Submission, err error) {
+	if stat, err := os.Stat(file); err != nil {
+		return nil, errors.Wrap(err, "Submission create error")
+	} else if stat.IsDir() {
+		return nil, errors.New("Submission create error: given path is a directory")
 	}
-	return nil
+	s = &Submission{
+		Problem: prob,
+		Result:  nil,
+		Ext:     filepath.Ext(file),
+	}
+	if s.Content, err = ioutil.ReadFile(file); err != nil {
+		return nil, errors.Wrap(err, "Submission create error")
+	}
+	if s.Language, err = languages.New(s.Ext); err != nil {
+		return nil, errors.Wrap(err, "Submission create error")
+	}
+	return
+}
+
+// Judge performs judging on the current submission.
+func (s *Submission) Judge() {
+	if err := s.Problem.Validate(); err != nil {
+		s.JudgeError = err
+		return
+	}
+	folder, err := ioutil.TempDir("", "submission-")
+	if err != nil {
+		s.JudgeError = err
+		return
+	}
+	defer folderClean(folder)
+	if err := ioutil.WriteFile(
+		filepath.Join(folder, s.Problem.Name+s.Ext),
+		s.Content,
+		0755,
+	); err != nil {
+		s.JudgeError = err
+		return
+	}
+	if err := s.Compile(folder); err != nil {
+		s.JudgeError = err
+		return
+	}
+	testResult, err := s.RunTests(folder)
+	if err != nil {
+		s.JudgeError = err
+		return
+	}
+	if err := s.AssignScore(testResult); err != nil {
+		s.JudgeError = err
+		return
+	}
 }

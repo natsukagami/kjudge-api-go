@@ -5,7 +5,6 @@ import (
 	"fmt"
 
 	"github.com/natsukagami/kjudge-api-go/task"
-	"github.com/natsukagami/kjudge-api-go/task/queue"
 )
 
 // Error is a fs-specific error, occured when FS tasks failed
@@ -19,7 +18,7 @@ func (f Error) Error() string {
 }
 
 func runFsTask(T *task.Task) error {
-	res := queue.Enqueue(T)
+	res := task.Enqueue(T)
 	if res.ExitCode != 0 {
 		return Error{res.Stderr, res.ExitCode}
 	}
@@ -28,30 +27,30 @@ func runFsTask(T *task.Task) error {
 
 // Copy creates a task that performs recursive copy.
 func Copy(source, dest string) error {
-	tsk := task.NewTask("cp", []string{"-a", source, dest}, "")
-	return runFsTask(&tsk)
+	tsk := task.New("cp", []string{"-a", source, dest}, "")
+	return runFsTask(tsk)
 }
 
 // Move creates a task that performs recursive move.
 func Move(source, dest string) error {
-	tsk := task.NewTask("mv", []string{"-a", source, dest}, "")
-	return runFsTask(&tsk)
+	tsk := task.New("mv", []string{"-a", source, dest}, "")
+	return runFsTask(tsk)
 }
 
 // Mkdir creates new folders according to the path specified
 func Mkdir(source string) error {
-	tsk := task.NewTask("mkdir", []string{"-p", source, "-m", "777"}, "")
-	return runFsTask(&tsk)
+	tsk := task.New("mkdir", []string{"-p", source, "-m", "777"}, "")
+	return runFsTask(tsk)
 }
 
 // Chmod changes a file/folder's permission
 func Chmod(source, mode string) error {
-	tsk := task.NewTask("chmod", []string{"-R", mode, source}, "")
-	return runFsTask(&tsk)
+	tsk := task.New("chmod", []string{"-R", mode, source}, "")
+	return runFsTask(tsk)
 }
 
 // Remove removes the specified folder/file
 func Remove(source string) error {
-	tsk := task.NewTask("rm", []string{"-rf", source}, "")
-	return runFsTask(&tsk)
+	tsk := task.New("rm", []string{"-rf", source}, "")
+	return runFsTask(tsk)
 }
